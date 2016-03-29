@@ -1,0 +1,129 @@
+---
+title: "Activity Monitoring Data"
+output: html_document
+---
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(extrafont)
+library(reshape2)
+library(plyr)
+library(RColorBrewer)
+library(lubridate)
+library(lattice)
+#loadfonts(device = "win")
+#########################
+# SWITCH BETWEEN LAPTOP AND PC
+# PREFIX LAPTOP
+#
+# prefix <- "C:/Users/Sebastian/Documents/Projects/MBA/50 - BMP/85 - CCB/02 - Graphics/"
+#
+# PREFIX PC
+#
+prefix  <- "E:/Dokumente/Projects/DataScience/Coursera Specialization/05 - Reproducible Research/code"
+#
+#########################
+wd <- prefix#paste(prefix, "test", sep = "")
+
+```
+## Switching to working directory and loading the csv
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+setwd(wd)
+df <- read.csv("activity.csv", sep = ",", header = TRUE, na.strings = "NA")
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+df$date <- as.Date(df$date, "%Y-%m-%d")
+steps_per_day <- tapply(df$steps, format(df$date, '%Y-%m-%d'), sum) 
+```
+## Histogram of the steps per day
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+qplot(steps_per_day, geom="histogram") 
+
+# Calculate mean and median
+steps_mean <- mean(steps_per_day, na.rm = TRUE)
+print(steps_mean)
+steps_median <- median(steps_per_day, na.rm = TRUE)
+print(steps_median)
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Calculate steps per interval
+df_cmp <- df[complete.cases(df),]
+steps_per_interval <- tapply(df_cmp$steps, df_cmp$interval, mean)
+steps_per_interval <- aggregate(df_cmp$steps, by=list(df_cmp$interval), mean)
+
+
+```
+## Plot time series of steps per interval
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+names(steps_per_interval)[names(steps_per_interval) == 'Group.1'] <- 'Interval'
+g <- ggplot(steps_per_interval, aes(x = Interval, y = x))
+g2 <- g + geom_line(color = "steelblue", size = 1)
+print(g2)
+```
+
+## Maximum number of steps in interval
+
+In the following I determine the interval the maximum number of steps:
+
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+stp_int_ord <- steps_per_interval[with(steps_per_interval, order(-x)), ]
+print(stp_int_ord[1,1])
+```
+
+## Count the numbers of rows containing NA
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+sum(is.na(df))
+
+```
+## Count the numbers of rows containing NA
+To fill the NAs with other values I use the following strategy:
+
+If an NA value is found the interval it occurs in is replaced by the mean over the steps per this respective interval over all days.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Fill NAs with means from steps_per_interval: 
+# 
+df_filled <- df
+df_filled$steps <- ifelse(is.na(df$steps), steps_per_interval$x[match(df$interval, steps_per_interval$Interval)], df$steps)
+```
+
+## Recalculate the steps per day
+Here I recalculate the sum of the steps per day with the dataframe in which the NAs have been replaced. Then I show the corresponding histogram of that data and calculate again the mean and the median.
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+steps_per_day_filled <- tapply(df_filled$steps, format(df_filled$date, '%Y-%m-%d'), sum) 
+qplot(steps_per_day_filled, geom="histogram") 
+
+steps_mean_filled <- mean(steps_per_day_filled, na.rm = TRUE)
+print(steps_mean_filled)
+steps_median_filled <- median(steps_per_day_filled)
+print(steps_median_filled)
+```
+# Compare weekdays with weekend
+Here I want to compare the profile of steps per interval at weekdays with that during the week. 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+df_filled$we <- ifelse(wday(df_filled$date) > 5, 1, 0)
+
+
+steps_per_interval_f <- tapply(df_filled$steps, df_filled$interval, mean)
+steps_per_interval_f <- aggregate(df_filled$steps, by=c(list(df_filled$interval), list(df_filled$we)), mean)
+names(steps_per_interval_f)[names(steps_per_interval_f) == 'Group.1'] <- 'Interval'
+names(steps_per_interval_f)[names(steps_per_interval_f) == 'Group.2'] <- 'Weekend'
+names(steps_per_interval_f)[names(steps_per_interval_f) == 'x'] <- 'Steps'
+
+steps_per_interval_f$Weekend[steps_per_interval_f$Weekend == 0] <- "No weekend"
+steps_per_interval_f$Weekend[steps_per_interval_f$Weekend == 1] <- "Weekend"
+
+pg <- ggplot(steps_per_interval_f, aes(Interval, Steps)) + geom_line(color = "steelblue", size = 1) + geom_point() + 
+  facet_wrap(~Weekend, ncol = 1)
+```
+
+We can see that activity is more distributed in a homogenous way on the weekend case. Here, the person is more active over the whole day.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+print(pg)
+```
+
