@@ -49,9 +49,23 @@ print(steps_median)
 ```
 
 
+```r
+# Calculate steps per interval
+df_cmp <- df[complete.cases(df),]
+steps_per_interval <- tapply(df_cmp$steps, df_cmp$interval, mean)
+steps_per_interval <- aggregate(df_cmp$steps, by=list(df_cmp$interval), mean)
+```
 ## Plot time series of steps per interval
 In the following figure I show the average of steps per 5 minutes
 interval across all dates.
+
+```r
+names(steps_per_interval)[names(steps_per_interval) == 'Group.1'] <- 'Interval'
+g <- ggplot(steps_per_interval, aes(x = Interval, y = x))
+g2 <- g + geom_line(color = "steelblue", size = 1)
+print(g2)
+```
+
 ![](PA1_template_files/figure-html/unnamed-chunk-7-1.png) 
 
 ## Maximum number of steps in interval
@@ -70,6 +84,10 @@ print(stp_int_ord[1,1])
 
 ## Count the numbers of rows containing NA
 
+```r
+sum(is.na(df))
+```
+
 ```
 ## [1] 2304
 ```
@@ -79,6 +97,12 @@ To fill the NAs with other values I use the following strategy:
 If an NA value is found the interval it occurs in is replaced by the mean over the steps per this respective interval over all days.
 
 
+```r
+# Fill NAs with means from steps_per_interval: 
+# 
+df_filled <- df
+df_filled$steps <- ifelse(is.na(df$steps), steps_per_interval$x[match(df$interval, steps_per_interval$Interval)], df$steps)
+```
 
 ## Recalculate the steps per day
 Here I recalculate the sum of the steps per day with the dataframe in which the NAs have been replaced. Then I show the corresponding histogram of that data and calculate again the mean and the median.
@@ -112,8 +136,29 @@ The values for mean and median do not deviate from the above values very much. T
 # Compare weekdays with weekend
 Here I want to compare the profile of steps per interval at weekdays with that during the week. 
 
+```r
+df_filled$we <- ifelse(wday(df_filled$date) > 5, 1, 0)
+
+
+steps_per_interval_f <- tapply(df_filled$steps, df_filled$interval, mean)
+steps_per_interval_f <- aggregate(df_filled$steps, by=c(list(df_filled$interval), list(df_filled$we)), mean)
+names(steps_per_interval_f)[names(steps_per_interval_f) == 'Group.1'] <- 'Interval'
+names(steps_per_interval_f)[names(steps_per_interval_f) == 'Group.2'] <- 'Weekend'
+names(steps_per_interval_f)[names(steps_per_interval_f) == 'x'] <- 'Steps'
+
+steps_per_interval_f$Weekend[steps_per_interval_f$Weekend == 0] <- "No weekend"
+steps_per_interval_f$Weekend[steps_per_interval_f$Weekend == 1] <- "Weekend"
+
+pg <- ggplot(steps_per_interval_f, aes(Interval, Steps)) + geom_line(color = "steelblue", size = 1) + geom_point() + 
+  facet_wrap(~Weekend, ncol = 1)
+```
 
 We can see that activity is more distributed in a homogenous way on the weekend case. Here, the person is more active over the whole day. During the week, a peak occurs in the morning followed by a long period of low activity and a small one at the end of the day.
+
+
+```r
+print(pg)
+```
 
 ![](PA1_template_files/figure-html/unnamed-chunk-13-1.png) 
 
